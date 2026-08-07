@@ -7443,6 +7443,13 @@ function onYouTubeIframeAPIReady() {
                 settings.DeleteAllAfterInstall = false;
                 btnNoDevice.Text = "ENABLE SIDELOADING";
                 UpdateStatusLabels();
+
+                // Sideloading is now off, so nothing needs ADB. Shut the ADB server down
+                // so it stops running in the background (the device-check poll is also
+                // skipped while in this mode). It restarts on demand the next time a
+                // command runs after sideloading is re-enabled.
+                DeviceConnected = false;
+                _ = Task.Run(() => ADB.RunAdbCommandToString("kill-server"));
             }
 
             settings.Save();
@@ -10208,6 +10215,11 @@ function onYouTubeIframeAPIReady() {
         }
         private async void timer_DeviceCheck(object sender, EventArgs e)
         {
+            // Skip the background "adb devices" poll entirely when the user has turned off
+            // sideloading. In that mode we deliberately don't touch ADB, so we avoid the
+            // per-second adb spawns that spike CPU on low-end machines.
+            if (settings.NodeviceMode) return;
+
             // Skip if a device is connected, we're in the middle of loading or other operations
             if (DeviceConnected || isLoading || isinstalling || isuploading) return;
 
